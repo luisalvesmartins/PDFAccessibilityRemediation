@@ -1,0 +1,11 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs
+/bin/Debug/net8.0
+/obj
+/website/.vs/PDFAccessWeb
+/website/bin/Debug/net8.0
+/website/obj
+/website/wwwroot/outputs
