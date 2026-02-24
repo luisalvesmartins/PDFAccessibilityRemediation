@@ -14,10 +14,10 @@
     <ProjectReference Include="..\EN301549PdfProcessor.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Content Update="wwwroot\app.css">
+    <Content Update="wwwroot\css\app.css">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Update="wwwroot\app.js">
+    <Content Update="wwwroot\js\app.js">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Update="wwwroot\index.html">

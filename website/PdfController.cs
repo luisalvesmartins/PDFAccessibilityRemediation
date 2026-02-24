@@ -31,8 +31,9 @@ public class PdfController : ControllerBase
 
     [HttpPost("remediar")]
     [RequestSizeLimit(250 * 1024 * 1024)]
-    public async Task<IActionResult> Remediar(IList<IFormFile> files)
+    public async Task<IActionResult> Remediar([FromForm] Remediacao Request)
     {
+        var files = Request.Files;
         if (files == null || files.Count == 0)
             return BadRequest(new { erro = "Nenhum ficheiro enviado." });
 
@@ -41,6 +42,16 @@ public class PdfController : ControllerBase
             f.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)).ToList();
 
         if (pdfs.Count == 0) return BadRequest(new { erro = "Apenas PDFs são aceites." });
+
+        var opcoes = new OpcoesRemediacao
+        {
+            AdicionarTags            = Request.AdicionarTags,
+            AltTextImagens           = Request.AltTextImagens,
+            CorrigirTitulo           = Request.CorrigirTitulo,
+            CorrigirIdioma           = Request.CorrigirIdioma,
+            CorrigirViewerPreferences = Request.CorrigirViewerPreferences,
+            CorrigirMetadadasXMP     = Request.CorrigirMetadadasXMP,
+        };
 
         var sessionId    = Guid.NewGuid().ToString("N")[..12];
         var pastaSession = Path.Combine(PastaOutputs, sessionId);
@@ -58,7 +69,7 @@ public class PdfController : ControllerBase
                 await using (var stream = System.IO.File.Create(caminhoUpload))
                     await file.CopyToAsync(stream);
 
-                var resultado = _remediador.Remediar(caminhoUpload, pastaSession);
+                var resultado = _remediador.Remediar(caminhoUpload, pastaSession, opcoes);
 
                 var relatorio    = resultado.AnaliseDepois != null
                     ? _gerador.GerarRelatorioTexto(resultado.AnaliseDepois)
@@ -131,6 +142,22 @@ public class PdfController : ControllerBase
     {
         return string.Join("_", nome.Split(Path.GetInvalidFileNameChars()));
     }
+}
+
+/// <summary>Form-bound request that carries files + feature flags.</summary>
+public class RemediasaoRequest  // note: named to avoid clash with built-in Request
+{ }
+
+// Real form model bound by [FromForm]
+public class Remediacao
+{
+    public List<IFormFile> Files { get; set; } = new();
+    public bool AdicionarTags             { get; set; } = true;
+    public bool AltTextImagens            { get; set; } = true;
+    public bool CorrigirTitulo            { get; set; } = true;
+    public bool CorrigirIdioma            { get; set; } = true;
+    public bool CorrigirViewerPreferences { get; set; } = true;
+    public bool CorrigirMetadadasXMP      { get; set; } = true;
 }
 
 public class ResultadoFicheiro

@@ -30,7 +30,7 @@ public class ServicodeRemediacao
     /// <summary>
     /// Processa um PDF e tenta remediar automaticamente os problemas de acessibilidade.
     /// </summary>
-    public ResultadoRemediacao Remediar(string caminhoOriginal, string? pastaDestino = null)
+    public ResultadoRemediacao Remediar(string caminhoOriginal, string? pastaDestino = null, OpcoesRemediacao? opcoes = null)
     {
         _logger.LogInformation("Iniciando remediação: {Arquivo}", caminhoOriginal);
 
@@ -38,6 +38,8 @@ public class ServicodeRemediacao
         {
             CaminhoArquivoOriginal = caminhoOriginal
         };
+
+        opcoes ??= new OpcoesRemediacao();
 
         try
         {
@@ -60,7 +62,7 @@ public class ServicodeRemediacao
                 ? resultado.AnaliseAntes.Metadatas.Idioma
                 : "pt-PT";
 
-            if (precisaAutoTagging)
+            if (precisaAutoTagging && opcoes.AdicionarTags)
             {
                 // Auto-tagging: extrai conteúdo, constrói árvore semântica e reescreve PDF
                 _logger.LogInformation("Documento não tagged — iniciando auto-tagging completo.");
@@ -86,18 +88,20 @@ public class ServicodeRemediacao
                     using var docMeta = new PdfDocument(leitorMeta, escritorMeta,
                         new StampingProperties().UseAppendMode());
 
-                    // Metadados que o auto-tagging não define
-                    AplicarCorrecaoTitulo(docMeta, resultado.AnaliseAntes.Metadatas, resultado);
-                    AplicarCorrecaoMetadadasXMP(docMeta, resultado.AnaliseAntes.Metadatas, resultado);
-                    // IdiomA e ViewerPreferences já são definidos pelo ServicoAutoTagging
-                    AplicarAltTextImagens(docMeta, resultado);
+                    if (opcoes.CorrigirTitulo)
+                        AplicarCorrecaoTitulo(docMeta, resultado.AnaliseAntes.Metadatas, resultado);
+                    if (opcoes.CorrigirMetadadasXMP)
+                        AplicarCorrecaoMetadadasXMP(docMeta, resultado.AnaliseAntes.Metadatas, resultado);
+                    if (opcoes.AltTextImagens)
+                        AplicarAltTextImagens(docMeta, resultado);
+                    // Idioma e ViewerPreferences são definidos pelo ServicoAutoTagging
                 }
                 File.Move(caminhoTmpMeta, resultado.CaminhoArquivoRemediado, overwrite: true);
             }
             else
             {
-                // Documento já tagged: stamping mode — apenas metadados e alt text
-                _logger.LogInformation("Documento já tagged — aplicando correções de metadados.");
+                // Documento já tagged (ou tagging desactivado): stamping mode
+                _logger.LogInformation("Aplicando correções de metadados via stamping.");
                 var caminhoTmp = resultado.CaminhoArquivoRemediado + ".tmp";
 
                 using (var leitor   = new PdfReader(caminhoOriginal))
@@ -106,15 +110,23 @@ public class ServicodeRemediacao
                     using var docStamped = new PdfDocument(leitor, escritor,
                         new StampingProperties().UseAppendMode());
 
-                    AplicarCorrecaoTitulo(docStamped, resultado.AnaliseAntes.Metadatas, resultado);
-                    AplicarCorrecaoIdioma(docStamped, resultado.AnaliseAntes.Metadatas, resultado);
-                    AplicarCorrecaoViewerPreferences(docStamped, resultado);
-                    AplicarCorrecaoMetadadasXMP(docStamped, resultado.AnaliseAntes.Metadatas, resultado);
-                    AplicarAltTextImagens(docStamped, resultado);
+                    if (opcoes.CorrigirTitulo)
+                        AplicarCorrecaoTitulo(docStamped, resultado.AnaliseAntes.Metadatas, resultado);
+                    if (opcoes.CorrigirIdioma)
+                        AplicarCorrecaoIdioma(docStamped, resultado.AnaliseAntes.Metadatas, resultado);
+                    if (opcoes.CorrigirViewerPreferences)
+                        AplicarCorrecaoViewerPreferences(docStamped, resultado);
+                    if (opcoes.CorrigirMetadadasXMP)
+                        AplicarCorrecaoMetadadasXMP(docStamped, resultado.AnaliseAntes.Metadatas, resultado);
+                    if (opcoes.AltTextImagens)
+                        AplicarAltTextImagens(docStamped, resultado);
                 }
 
                 File.Move(caminhoTmp, resultado.CaminhoArquivoRemediado, overwrite: true);
-                resultado.AcoesRealizadas.Add("[1.3.1] Documento já tagged. Estrutura de tags preservada.");
+                if (!opcoes.AdicionarTags || resultado.AnaliseAntes.Metadatas.ETagged)
+                    resultado.AcoesRealizadas.Add("[1.3.1] Tags: " + (resultado.AnaliseAntes.Metadatas.ETagged
+                        ? "documento já tagged. Estrutura preservada."
+                        : "adição de tags desactivada pelo utilizador."));
             }
 
             // 4. Analisar depois
